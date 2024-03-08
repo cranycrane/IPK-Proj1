@@ -8,8 +8,8 @@ namespace IPK_Proj1.Clients
 {
     abstract public class Client
     {
-        private string ServerIp { get; set; }
-        private int Port { get; set; }
+        protected string ServerIp { get; set; }
+        protected int Port { get; set; }
 
         public string? DisplayName { get; set; }
 
@@ -35,16 +35,18 @@ namespace IPK_Proj1.Clients
 
         public abstract Task ListenForMessagesAsync();
 
+        protected abstract IMessage HandleServerMessage(byte[] message, int bytesRead);
+
+        protected abstract void HandleReplyMessage(IMessage message);
+        protected abstract void HandleChatMessage(IMessage message);
+        protected abstract void HandleErrorMessage(IMessage message);
+        protected abstract void HandleByeMessage(IMessage message);
+
         
-        public abstract string? Receive();
         public abstract void Disconnect();
 
         public abstract bool Connected();
-        protected abstract void HandleServerMessage(string message);
-
-        protected abstract void HandleReplyMessage(string status, string[] splittedMessage);
-        protected abstract void HandleChatMessage(string displayName, string[] splittedMessage);
-        protected abstract void HandleErrorMessage(string[] splittedMessage);
-        protected abstract void HandleByeMessage();
+   
+        
     }
 }

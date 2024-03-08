@@ -19,7 +19,7 @@ namespace IPK_Proj1.Commands
 
             client.ChangeDisplayName(displayName);
             
-            Console.Write("New display name successfully set");
+            Console.Write("New display name successfully set\n");
             return Task.CompletedTask;
         }
 

@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using IPK_Proj1.Exceptions;
 
 namespace IPK_Proj1.Factory
 {
@@ -19,12 +20,10 @@ namespace IPK_Proj1.Factory
                     return new HelpCommand();
                 case "join":
                     return new JoinCommand();
-                    /*
                 case "rename":
-                    return;// new RenameCommand();
-                    */
+                    return new RenameCommand();
                 default:
-                    throw new InvalidOperationException("Unknown command.");
+                    throw new UnknownCommandException("Entered command not found");
             }
         }
     }

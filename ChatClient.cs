@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 
 using IPK_Proj1.Clients;
 using IPK_Proj1.Commands;
+using IPK_Proj1.Exceptions;
 using IPK_Proj1.Factory;
 using IPK_Proj1.Messages;
 
@@ -15,18 +16,12 @@ namespace IPK_Proj1
     {
         private Client client;
 
-        private ushort timeout;
-
-        private byte retries;
-
         private readonly CommandFactory commandFactory;
         
 
         public ChatClient(CommandLineSettings settings)
         {
             client = CreateClient(settings);
-            timeout = settings.Timeout;
-            retries = settings.Retries;
             commandFactory = new CommandFactory();
             
         }
@@ -63,12 +58,16 @@ namespace IPK_Proj1
             string commandName = splitInput[0];
             string[] parameters = splitInput.Skip(1).ToArray();
 
-            ICommand command = commandFactory.GetCommand(commandName);
             try
             {
+                ICommand command = commandFactory.GetCommand(commandName);
                 await command.Execute(client, parameters);
             }
-            catch (Exception e)
+            catch (UnknownCommandException e)
+            {
+                await Console.Error.WriteLineAsync("Zadany prikaz nenalezen, pouzijte /help");
+            }
+            catch (System.Exception e)
             {
                 await Console.Error.WriteLineAsync(e.Message);
             }
@@ -97,7 +96,7 @@ namespace IPK_Proj1
             }
             else if (settings.Protocol == "udp")
             {
-                return new ClientUdp(settings.ServerIP, settings.Port);
+                return new ClientUdp(settings.ServerIP, settings.Port, settings.Timeout, settings.Retries);
             }
             else
             {

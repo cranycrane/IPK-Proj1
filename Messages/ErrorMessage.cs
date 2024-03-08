@@ -1,4 +1,4 @@
-﻿using System;
+﻿using System.Text;
 
 
 namespace IPK_Proj1.Messages
@@ -17,7 +17,16 @@ namespace IPK_Proj1.Messages
 
         public byte[] ToUdpBytes(ushort messageId)
         {
-	        throw new NotImplementedException();
+	        List<byte> bytesList = new List<byte>();
+
+	        bytesList.Add(0xFE);
+
+	        bytesList.AddRange(BitConverter.GetBytes(messageId));
+
+	        bytesList.AddRange(Encoding.UTF8.GetBytes(DisplayName + "\0"));
+	        bytesList.AddRange(Encoding.UTF8.GetBytes(Content + "\0"));
+
+	        return bytesList.ToArray();
         }
 
         public string ToTcpString()

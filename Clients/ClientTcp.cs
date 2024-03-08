@@ -37,32 +37,28 @@ namespace IPK_Proj1.Clients
             }
         }
 
-        public override void Disconnect()
-        {
-            throw new NotImplementedException();
-        }
-
         public override async Task Send(IMessage message)
         {
-            Byte[] data = System.Text.Encoding.ASCII.GetBytes(message.ToTcpString());
-            await networkStream!.WriteAsync(data, 0, data.Length);
+            try
+            {
+                Byte[] data = System.Text.Encoding.ASCII.GetBytes(message.ToTcpString());
+                await networkStream!.WriteAsync(data, 0, data.Length);
+            }
+            catch (Exception e)
+            {
+                await Console.Error.WriteLineAsync($"Vyskytla se chyba {e.Message}");
+            }
+
         }
 
-        public override string? Receive()
+        public string? Receive()
         {
             return reader.ReadLine();
         }
 
         public override bool Connected()
         {
-            if (tcpClient.Connected)
-            {
-                return true;
-            }
-            else
-            {
-                return false;
-            }
+            return tcpClient.Connected;
         }
 
         public override async Task ListenForMessagesAsync()
@@ -95,10 +91,10 @@ namespace IPK_Proj1.Clients
         }
 
 
-        protected override void HandleServerMessage(string message)
+        protected void HandleServerMessage(string message)
         {
             string[] splittedMessage = message.Split(' ');
-            string messageCode = splittedMessage[0];
+            string messageCode = message.Split(' ')[0];
 
             if (messageCode == "REPLY")
             {
@@ -155,11 +151,11 @@ namespace IPK_Proj1.Clients
         protected override void HandleByeMessage()
         {
             Console.WriteLine("Server has ended the connection. Exiting application");
-            CloseConnection();
+            Disconnect();
             Environment.Exit(0);
         }
         
-        protected void CloseConnection()
+        public override void Disconnect()
         {
             if (networkStream != null)
             {
