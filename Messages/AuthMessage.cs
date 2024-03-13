@@ -9,12 +9,14 @@ namespace IPK_Proj1.Messages
 		private string Username { get; set; }
 		private string DisplayName { get; set; }
 		private string Secret { get; set; }
-
-		public AuthMessage(string username, string secret, string displayName)
+		public bool IsAwaitingReply { get; set; }
+		
+		public AuthMessage(string username, string secret, string displayName, ushort? messageId = null)
 		{
 			Username = username;
 			Secret = secret;
 			DisplayName = displayName;
+			IsAwaitingReply = true;
 		}
 		
 

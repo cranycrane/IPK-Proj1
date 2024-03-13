@@ -39,6 +39,13 @@ namespace IPK_Proj1.Clients
 
         public override async Task Send(IMessage message)
         {
+            if (IsWaittingReply && message.GetType() != typeof(ByeMessage))
+            {
+                return;
+            }
+            
+            IsWaittingReply = message.IsAwaitingReply;
+            
             try
             {
                 Byte[] data = System.Text.Encoding.ASCII.GetBytes(message.ToTcpString());
@@ -72,10 +79,10 @@ namespace IPK_Proj1.Clients
                     var bytesRead = await networkStream.ReadAsync(buffer, 0, buffer.Length);
                     if (bytesRead > 0)
                     {
-                        var message = Encoding.UTF8.GetString(buffer, 0, bytesRead);
+                        // var message = Encoding.UTF8.GetString(buffer, 0, bytesRead);
                         try
                         {
-                            HandleServerMessage(message);
+                            HandleServerMessage(buffer, bytesRead);
                         }
                         catch (Exception e)
                         {
@@ -91,22 +98,24 @@ namespace IPK_Proj1.Clients
         }
 
 
-        protected void HandleServerMessage(string message)
+        protected override void HandleServerMessage(byte[] receivedBytes, int bytesRead)
         {
-            string[] splittedMessage = message.Split(' ');
-            string messageCode = message.Split(' ')[0];
+            var messageString = Encoding.UTF8.GetString(receivedBytes, 0, bytesRead);
+            
+            string[] splittedMessage = messageString.Split(' ');
+            string messageCode = messageString.Split(' ')[0];
 
             if (messageCode == "REPLY")
             {
-                HandleReplyMessage(splittedMessage[1], splittedMessage);
+                HandleReplyMessage(new ReplyMessage(string.Join(" ", splittedMessage.Skip(3)), splittedMessage[1]));
             }
             else if (messageCode == "MSG")
             {
-                HandleChatMessage(splittedMessage[2], splittedMessage);
+                HandleChatMessage(new ChatMessage(splittedMessage[2], string.Join(" ", splittedMessage.Skip(4))));
             }
             else if (messageCode == "ERR")
             {
-                HandleErrorMessage(splittedMessage);
+                HandleErrorMessage(new ErrorMessage(splittedMessage[2], string.Join(" ", splittedMessage.Skip(4))));
             }
             else if (messageCode == "BYE\r\n")
             {
@@ -114,43 +123,13 @@ namespace IPK_Proj1.Clients
             }
             else
             {
-                throw new Exception($"Unexpected server response '{message}'");
+                throw new Exception($"Unexpected server response code '{messageCode}'");
             }
         }
-
-        protected override void HandleReplyMessage(string status, string[] splittedMessage)
-        {
-            var messageContent = string.Join(" ", splittedMessage.Skip(3));
-            
-            if (status == "OK")
-            {
-                Console.Error.Write($"Success: {messageContent}");
-            }
-            else if (status == "NOK")
-            {
-                Console.Error.Write($"Failure: {messageContent}");
-            }
-            else
-            {
-                throw new Exception($"Unexpected server response code '{status}'");
-            }
-        }
-
-        protected override void HandleChatMessage(string displayName, string[] splittedMessage)
-        {
-            var messageContent = string.Join(" ", splittedMessage.Skip(4));
-            Console.Write($"{displayName}: {messageContent}");
-        }
-
-        protected override void HandleErrorMessage(string[] splittedMessage)
-        {
-            var messageContent = string.Join(" ", splittedMessage.Skip(4));
-            Console.Error.Write($"ERROR: {messageContent}");
-        }
+        
 
         protected override void HandleByeMessage()
         {
-            Console.WriteLine("Server has ended the connection. Exiting application");
             Disconnect();
             Environment.Exit(0);
         }

@@ -78,6 +78,9 @@ namespace IPK_Proj1
                         // Assuming that showing help should not stop processing arguments
                         settings.ShowHelp = true;
                         break;
+                    case "--debug":
+                        settings.IsDebugEnabled = true;
+                        break;
                     default:
                         Console.WriteLine($"Unknown argument: {args[i]}");
                         System.Environment.Exit(1);

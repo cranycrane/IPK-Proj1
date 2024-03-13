@@ -5,14 +5,20 @@ namespace IPK_Proj1.Messages
 {
 	public class ErrorMessage : IMessage
 	{
-		private string DisplayName { get; set; }
+		public string DisplayName { get; set; }
 
-		private string Content { get; set; }
+		public string Content { get; set; }
+		
+		public ushort? RefMessageId { get; set; }
+		public bool IsAwaitingReply { get; set; }
 
-		public ErrorMessage(string displayName, string content)
+
+		public ErrorMessage(string displayName, string content, ushort? refMessageId = null)
 		{
 			DisplayName = displayName;
 			Content = content;
+			RefMessageId = refMessageId;
+			IsAwaitingReply = false;
 		}
 
         public byte[] ToUdpBytes(ushort messageId)

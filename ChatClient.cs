@@ -28,7 +28,15 @@ namespace IPK_Proj1
 
         public async Task Start()
         {
-            Console.WriteLine("IPKChat-24 Version 1.0, write /help for more information");
+            Console.CancelKeyPress += async (sender, e) =>
+            {
+                e.Cancel = true; // Zabrání ukončení procesu
+                await client.Send(new ByeMessage());
+                client.Disconnect(); // Řádné ukončení aplikace
+                Logger.Debug("Koncim aplikaci");
+            };
+            
+            Logger.Debug("IPKChat-24 Version 1.0, write /help for more information");
 
             var listeningTask = client.ListenForMessagesAsync();
             
@@ -90,18 +98,19 @@ namespace IPK_Proj1
 
         private Client CreateClient(CommandLineSettings settings)
         {
-            if (settings.Protocol == "tcp")
+            try
             {
-                return new ClientTcp(settings.ServerIP, settings.Port);
+                return settings.Protocol switch
+                {
+                    "tcp" => new ClientTcp(settings.ServerIP, settings.Port),
+                    "udp" => new ClientUdp(settings.ServerIP, settings.Port, settings.Timeout, settings.Retries),
+                    _ => throw new ArgumentException("Unsupported protocol")
+                };
             }
-            else if (settings.Protocol == "udp")
+            catch (ArgumentException e)
             {
-                return new ClientUdp(settings.ServerIP, settings.Port, settings.Timeout, settings.Retries);
-            }
-            else
-            {
-                Console.Error.WriteLine("Neočekávaný protokol: " + settings.Protocol);
-                throw new ArgumentException("Unsupported protocol");
+                //Console.Error.WriteLine($"ERR: {e.Message}");
+                throw new InvalidOperationException("Nepodařilo se vytvořit klienta", e);
             }
         }
 

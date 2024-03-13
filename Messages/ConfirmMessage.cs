@@ -3,20 +3,15 @@
 
 namespace IPK_Proj1.Messages
 {
-    public class ByeMessage : IMessage
+    public class ConfirmMessage : IMessage
     {
-        public bool IsAwaitingReply { get; set; }
+        public bool IsAwaitingReply { get; set; } = false;
 
-        public ByeMessage(ushort? messageId = null)
-        {
-            IsAwaitingReply = false;
-        }
         public byte[] ToUdpBytes(ushort messageId)
         {
             List<byte> bytesList = new List<byte>();
 
-            bytesList.Add(0xFF);
-
+            bytesList.Add(0x00);
             bytesList.AddRange(BitConverter.GetBytes(messageId));
 
             return bytesList.ToArray();
@@ -24,7 +19,7 @@ namespace IPK_Proj1.Messages
 
         public string ToTcpString()
         {
-            return "BYE\r\n";
+            throw new NotImplementedException();
         }
     }
 }

@@ -5,25 +5,27 @@ namespace IPK_Proj1.Messages
 {
 	public class ReplyMessage : IMessage
 	{
-		private string DisplayName { get; set; }
 
-		private string Content { get; set; }
+		public string Content { get; set; }
 		
-		private bool IsOk { get; set; }
+		public string IsOk { get; set; }
 		
-		private ushort? RefMessageId { get; set; }
+		public ushort? MessageId { get; set; }
+		public ushort? RefMessageId { get; set; }
+		public bool IsAwaitingReply { get; set; } = false;
 
-		public ReplyMessage(string displayName, string content, bool isOk, ushort? refMessageId = null)
+
+		public ReplyMessage(string content, string isOk, ushort? messageId = null, ushort? refMessageId = null)
 		{
-			DisplayName = displayName;
 			Content = content;
 			IsOk = isOk;
+			MessageId = messageId;
 			RefMessageId = refMessageId;
 		}
 
         public byte[] ToUdpBytes(ushort messageId)
         {
-	        if (!RefMessageId.HasValue)
+	        if (!RefMessageId.HasValue || !MessageId.HasValue)
 	        {
 		        throw new Exception("Interni chyba klienta");
 	        }
@@ -32,8 +34,8 @@ namespace IPK_Proj1.Messages
 
 	        bytesList.Add(0x01);
 
-	        bytesList.AddRange(BitConverter.GetBytes(messageId));
-	        bytesList.AddRange(BitConverter.GetBytes(IsOk ? 1 : 0));
+	        bytesList.AddRange(BitConverter.GetBytes(MessageId.Value));
+	        bytesList.AddRange(BitConverter.GetBytes(IsOk == "OK" ? 1 : 0));
 	        bytesList.AddRange(BitConverter.GetBytes(RefMessageId.Value));
 	        bytesList.AddRange(Encoding.UTF8.GetBytes(Content + "\0"));
 
@@ -42,8 +44,7 @@ namespace IPK_Proj1.Messages
 
         public string ToTcpString()
         {
-	        var isOk = IsOk ? "OK" : "NOK";
-	        return $"REPLY {isOk} IS {Content}\r\n";
+	        return $"REPLY {IsOk} IS {Content}\r\n";
         }
 	}
 }

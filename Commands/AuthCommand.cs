@@ -30,6 +30,7 @@ namespace IPK_Proj1.Commands
             
             var message = new AuthMessage(username, secret, displayName);
             await client.Send(message);
+            client.IsWaittingReply = true;
         }
 
         public void ValidateArgs(string[] parameters)

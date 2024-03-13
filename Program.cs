@@ -15,15 +15,26 @@ class Program
 
         CommandLineSettings settings = parser.Parse(args);
 
-        if (settings.ShowHelp) 
+        if (settings.ShowHelp)
         {
             return;
         }
 
-        ChatClient chatClient = new ChatClient(settings);
+        if (settings.IsDebugEnabled)
+        {
+            Logger.IsDebugEnabled = true;
+        }
+        
+        try
+        {
+            ChatClient chatClient = new ChatClient(settings);
+            await chatClient.Start();
+        }
+        catch (InvalidOperationException e)
+        {
+            await Console.Error.WriteLineAsync($"ERR: {e.Message}");
+            System.Environment.Exit(1);
+        }
 
-        await chatClient.Start();
     }
-
-
 }

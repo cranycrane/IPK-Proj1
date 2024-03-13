@@ -8,11 +8,18 @@ namespace IPK_Proj1.Messages
 		public string DisplayName { get; set; }
 		
 		public string Content { get; set; }
+		
+		public ushort? RefMessageId { get; set; }
+		
+		public bool IsAwaitingReply { get; set; }
 
-		public ChatMessage(string displayName, string content)
+
+		public ChatMessage(string displayName, string content, ushort? refMessageId = null)
 		{
 			DisplayName = displayName;
 			Content = content;
+			RefMessageId = refMessageId;
+			IsAwaitingReply = false;
 		}
 
         public byte[] ToUdpBytes(ushort messageId)

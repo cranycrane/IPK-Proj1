@@ -14,5 +14,6 @@ namespace IPK_Proj1
         public ushort Timeout { get; set; } = 250; // Default value
         public byte Retries { get; set; } = 3; // Default value
         public bool ShowHelp { get; set; } = false;
+        public bool IsDebugEnabled { get; set; } = false;
     }
 }

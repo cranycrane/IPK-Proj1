@@ -14,7 +14,7 @@ namespace IPK_Proj1.Clients
     {
         private UdpClient UdpClient;
         public IPEndPoint Server { get; set; }
-        private IPEndPoint ServerAssignedPort;
+        private IPEndPoint? ServerAssignedPort = null;
         private ushort MessageId;
         private ushort Timeout;
         private byte MaxRetries;
@@ -25,18 +25,15 @@ namespace IPK_Proj1.Clients
         {
             Timeout = timeout;
             MaxRetries = retries;
-            // MaxRetries = retries;
             MessageId = 0;
             ReceivedMessageIds = [];
             IsAck = false;
             Server = CreateIpEndPoint(Port);
-            ServerAssignedPort = new IPEndPoint(IPAddress.Any, 0);
-            Console.WriteLine($"IP adresa serveru: {Server.Address}");
-            Console.WriteLine($"Port serveru: {Server.Port}");
             UdpClient = new UdpClient(58452);
-
+            Logger.Debug($"IP adresa serveru: {Server.Address}");
+            Logger.Debug($"Port serveru: {Server.Port}");
         }
-        
+
         private IPEndPoint CreateIpEndPoint(int port)
         {
             IPAddress? ipAddress;
@@ -44,7 +41,7 @@ namespace IPK_Proj1.Clients
             if (!IPAddress.TryParse(ServerIp, out ipAddress))
             {
                 IPHostEntry hostEntry = Dns.GetHostEntry(ServerIp);
-        
+
                 if (hostEntry.AddressList.Length == 0)
                 {
                     throw new ArgumentException("Nelze získat IP adresu z hostname.", nameof(ServerIp));
@@ -67,69 +64,158 @@ namespace IPK_Proj1.Clients
             throw new NotImplementedException();
         }
 
+        protected override void HandleByeMessage()
+        {
+            Disconnect();
+        }
+
         public override void Disconnect()
         {
-            throw new NotImplementedException();
+            UdpClient.Close();
+            Environment.Exit(0);
         }
-        
+
         public override async Task ListenForMessagesAsync()
         {
-            Console.WriteLine("PRIJIMAM ZPRAVY SERVERU");
-            while (true) // nebo dokud není spojení ukončeno
+            while (true)
             {
                 UdpReceiveResult result;
                 try
                 {
-                    result = await UdpClient.ReceiveAsync(); // Přijme datagram z jakéhokoli zdroje a portu
+                    result = await UdpClient.ReceiveAsync(); 
                 }
                 catch (ObjectDisposedException)
                 {
-                    // UdpClient byl uzavřen, ukončíme smyčku
                     break;
                 }
 
                 byte[] receivedBytes = result.Buffer;
-                
-                IPEndPoint senderEndPoint = result.RemoteEndPoint; // Získáme informace o odesílateli
 
-                HandleServerMessage(receivedBytes[0], receivedBytes.Skip(1).ToArray());
+                Server = result.RemoteEndPoint;
 
-                // Zde můžete přidat logiku pro zpracování zprávy, například potvrzení přijetí zprávy, pokud je to potřeba
+                if (receivedBytes.Length > 0)
+                {
+                    try
+                    {
+                        HandleServerMessage(receivedBytes, receivedBytes.Length);
+                    }
+                    catch (Exception e)
+                    {
+                        await Console.Error.WriteLineAsync($"ERR: {e.Message}");
+                    }
+                }
             }
-            Console.WriteLine("KONCIME SMYCKU");
         }
 
-        protected void HandleServerMessage(byte messageCode, byte[] messageBytes)
+        protected override async void HandleServerMessage(byte[] receivedBytes, int bytesRead)
         {
-
-            switch (messageCode)
+            ushort messageId = BitConverter.ToUInt16(receivedBytes, 1);
+            if (receivedBytes[0] != 0)
             {
-                case 0x00:
+                await SendConfirmMessage(messageId);
+            }
+
+            switch (receivedBytes[0])
+            {
+                case 0:
+                {
                     IsAck = true;
                     break;
-                case 0x01:
-                    Console.WriteLine("REPLY");
+                }
+                case 1:
+                {
+                    string isOk;
+                    if (receivedBytes[3] == 1)
+                    {
+                        isOk = "OK";
+                    }
+                    else
+                    {
+                        isOk = "NOK";
+                    }
+
+                    IsWaittingReply = false;
+                    Logger.Debug($"Got REPLY: {IsWaittingReply}");
+                    string content = Encoding.UTF8.GetString(receivedBytes.Skip(6).ToArray());
+                    ushort refMessageId = BitConverter.ToUInt16(receivedBytes, 4);
+                    HandleReplyMessage(new ReplyMessage(content, isOk, messageId, refMessageId));
                     break;
-                case 0x04:
-                    Console.WriteLine("MESSAGE");
+                }
+                case 4:
+                {
+                    string displayName = ExtractDisplayName(receivedBytes, 3);
+                    string content = Encoding.UTF8.GetString(receivedBytes.Skip(displayName.Length + 3).ToArray());
+                    HandleChatMessage(new ChatMessage(displayName, content, messageId));
                     break;
-                case 0xFE:
-                    Console.WriteLine("ERROR");
+                }
+                case 254:
+                {
+                    string displayName = ExtractDisplayName(receivedBytes, 3);
+                    string content = Encoding.UTF8.GetString(receivedBytes.Skip(displayName.Length + 3).ToArray());
+                    HandleErrorMessage(new ErrorMessage(displayName, content, messageId));
                     break;
-                case 0xFF:
+                }
+                case 255:
+                {
                     Console.WriteLine("BYE");
+                    HandleByeMessage();
                     break;
+                }
                 default:
+                {
                     Console.Error.WriteLine("TUTO ZPRAVU JSEM NECEKAL");
                     break;
+                }
             }
         }
+
+        protected async Task SendConfirmMessage(ushort refMessageId)
+        {
+            Byte[] data = new ConfirmMessage().ToUdpBytes(refMessageId);
+            try
+            {
+                await UdpClient.SendAsync(data, data.Length, Server);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"ERR: {ex.Message}");
+            }
+        }
+
+        protected string ExtractDisplayName(byte[] receivedBytes, int startIndex)
+        {
+            // Nalezení indexu nulového bajtu, který ukončuje DisplayName
+            int endIndexOfDisplayName = Array.IndexOf(receivedBytes, (byte)0, startIndex);
+
+            if (endIndexOfDisplayName == -1)
+            {
+                throw new Exception("Nulový bajt ukončující DisplayName nebyl nalezen.");
+            }
+
+            // Výpočet délky DisplayName
+            int displayNameLength = endIndexOfDisplayName - startIndex;
+
+            // Extrahování bajtů DisplayName a jejich převod na řetězec
+            string displayName = Encoding.UTF8.GetString(receivedBytes, startIndex, displayNameLength);
+
+            return displayName;
+        }
+        
 
         public override async Task Send(IMessage message)
         {
+            Logger.Debug($"IsWaittingReply: {IsWaittingReply}");
+            
+            if (IsWaittingReply)
+            {
+                Logger.Debug("CANT SEND, WAITTING");
+                return;
+            }
+            IsWaittingReply = message.IsAwaitingReply;
+            
             Byte[] data = message.ToUdpBytes(GetNextMessageId());
-            byte retryCount = 0; 
-
+            byte retryCount = 0;
+            
             try
             {
                 while (retryCount < MaxRetries && !IsAck)
@@ -141,22 +227,19 @@ namespace IPK_Proj1.Clients
                     if (!IsAck)
                     {
                         retryCount++;
-                        await Console.Error.WriteLineAsync($"Zprava nebyla potvrzena, opakuji pokus {retryCount} z {MaxRetries}");
+                        Logger.Debug(
+                            $"Zprava nebyla potvrzena, opakuji pokus {retryCount} z {MaxRetries}");
                     }
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Vyskytla se chyba: {ex.Message}");
+                await Console.Error.WriteLineAsync($"ERR: {ex.Message}");
             }
 
-            if (IsAck)
+            if (!IsAck)
             {
-                Console.WriteLine("Zprava byla potvrzena serverem");
-            }
-            else
-            {
-                await Console.Error.WriteLineAsync("Chyba: Vycerpany vsechny pokusy odeslani.");
+                await Console.Error.WriteLineAsync("ERR: Vycerpany vsechny pokusy odeslani.");
             }
 
             IsAck = false;
@@ -167,29 +250,10 @@ namespace IPK_Proj1.Clients
             return true;
         }
 
-        protected void HandleReplyMessage(byte[] message)
-        {
-            throw new NotImplementedException();
-        }
-
-        protected override void HandleChatMessage(string displayName, string[] splittedMessage)
-        {
-            throw new NotImplementedException();
-        }
-
-        protected override void HandleErrorMessage(string[] splittedMessage)
-        {
-            throw new NotImplementedException();
-        }
-
-        protected override void HandleByeMessage()
-        {
-            throw new NotImplementedException();
-        }
 
         private ushort GetNextMessageId()
         {
-            return ++MessageId;
+            return MessageId++;
         }
     }
 }

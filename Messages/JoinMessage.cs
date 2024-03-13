@@ -7,11 +7,14 @@ namespace IPK_Proj1.Messages
 	{
 		public string ChannelId { get; set; }
 		public string DisplayName { get; set; }
+		public ushort? RefMessageId { get; set; }
+		public bool IsAwaitingReply { get; set; } = false;
 
-		public JoinMessage(string channelId, string displayName)
+		public JoinMessage(string channelId, string displayName, ushort? refMessageId = null)
 		{
 			ChannelId = channelId;
 			DisplayName = displayName;
+			RefMessageId = refMessageId;
 		}
 
         public byte[] ToUdpBytes(ushort messageId)
