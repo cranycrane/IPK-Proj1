@@ -29,7 +29,7 @@ namespace IPK_Proj1.Clients
             ReceivedMessageIds = [];
             IsAck = false;
             Server = CreateIpEndPoint(Port);
-            UdpClient = new UdpClient(58452);
+            UdpClient = new UdpClient(0);
             Logger.Debug($"IP adresa serveru: {Server.Address}");
             Logger.Debug($"Port serveru: {Server.Port}");
         }
@@ -204,9 +204,7 @@ namespace IPK_Proj1.Clients
 
         public override async Task Send(IMessage message)
         {
-            Logger.Debug($"IsWaittingReply: {IsWaittingReply}");
-            
-            if (IsWaittingReply)
+            if (IsWaittingReply && message.GetType() != typeof(ByeMessage))
             {
                 Logger.Debug("CANT SEND, WAITTING");
                 return;

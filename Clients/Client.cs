@@ -30,7 +30,7 @@ namespace IPK_Proj1.Clients
         {
             if (!Regex.IsMatch(newName, "^[\x20-\x7E]{1,20}$"))
             {
-                throw new ArgumentException("Displayname must contain only printable characters and maximum of 20");
+                throw new ArgumentException("ERR: Displayname must contain only printable characters and maximum of 20");
             }
 
             DisplayName = newName;
@@ -48,26 +48,26 @@ namespace IPK_Proj1.Clients
         {
             if (message.IsOk == "OK")
             {
-                Console.Error.Write($"Success: {message.Content}");
+                Console.Error.Write($"Success: {message.Content}\n");
             }
             else if (message.IsOk == "NOK")
             {
-                Console.Error.Write($"Failure: {message.Content}");
+                Console.Error.Write($"Failure: {message.Content}\n");
             }
             else
             {
-                throw new Exception($"Unexpected server status code '{message.IsOk}'");
+                throw new Exception($"ERR: Unexpected server status code '{message.IsOk}'");
             }
         }
 
         protected void HandleChatMessage(ChatMessage message)
         {
-            Console.Write($"{message.DisplayName}: {message.Content}");
+            Console.Write($"{message.DisplayName}: {message.Content}\n");
         }
 
         protected void HandleErrorMessage(ErrorMessage message)
         {
-            Console.Error.Write($"ERROR: {message.Content}");
+            Console.Error.Write($"ERR FROM {message.DisplayName}: {message.Content}\n");
             Disconnect();
         }
         
