@@ -1,6 +1,7 @@
 ﻿using System.Net.Sockets;
 using System.Text;
 using IPK_Proj1.Messages;
+using System.Threading;
 
 namespace IPK_Proj1.Clients
 {
@@ -39,23 +40,33 @@ namespace IPK_Proj1.Clients
 
         public override async Task Send(IMessage message)
         {
-            if (IsWaittingReply && message.GetType() != typeof(ByeMessage))
+            // Pokud není zpráva typu ByeMessage a již čekáme na odpověď, přerušit
+            if (IsWaitingReply && message.GetType() != typeof(ByeMessage))
             {
+                Logger.Debug("Waiting for reply, can't send");
                 return;
             }
-            
-            IsWaittingReply = message.IsAwaitingReply;
-            
+
+            await SendSemaphore.WaitAsync(); // Počká, dokud nebude možné vstoupit
+
             try
             {
+                IsWaitingReply = message.IsAwaitingReply;
+
                 Byte[] data = System.Text.Encoding.ASCII.GetBytes(message.ToTcpString());
                 await networkStream!.WriteAsync(data, 0, data.Length);
             }
             catch (Exception e)
             {
-                await Console.Error.WriteLineAsync($"Vyskytla se chyba {e.Message}");
+                await Console.Error.WriteLineAsync($"An error occurred: {e.Message}");
             }
-
+            finally
+            {
+                if (!IsWaitingReply)
+                {
+                    SendSemaphore.Release(); // Uvolní semafor, pokud nečekáme na odpověď
+                }
+            }
         }
 
         public string? Receive()
@@ -82,7 +93,7 @@ namespace IPK_Proj1.Clients
                         // var message = Encoding.UTF8.GetString(buffer, 0, bytesRead);
                         try
                         {
-                            HandleServerMessage(buffer, bytesRead);
+                            await HandleServerMessage(buffer, bytesRead);
                         }
                         catch (Exception e)
                         {
@@ -98,16 +109,19 @@ namespace IPK_Proj1.Clients
         }
 
 
-        protected override void HandleServerMessage(byte[] receivedBytes, int bytesRead)
+        protected override async Task HandleServerMessage(byte[] receivedBytes, int bytesRead)
         {
             var messageString = Encoding.UTF8.GetString(receivedBytes, 0, bytesRead);
+            messageString = messageString.Replace("\r\n", "");
             
             string[] splittedMessage = messageString.Split(' ');
             string messageCode = messageString.Split(' ')[0];
 
             if (messageCode == "REPLY")
             {
-                HandleReplyMessage(new ReplyMessage(string.Join(" ", splittedMessage.Skip(3)), splittedMessage[1]));
+                IsWaitingReply = false;
+                SendSemaphore.Release();
+                await HandleReplyMessage(new ReplyMessage(string.Join(" ", splittedMessage.Skip(3)), splittedMessage[1]));
             }
             else if (messageCode == "MSG")
             {
@@ -115,7 +129,7 @@ namespace IPK_Proj1.Clients
             }
             else if (messageCode == "ERR")
             {
-                HandleErrorMessage(new ErrorMessage(splittedMessage[2], string.Join(" ", splittedMessage.Skip(4))));
+                await HandleErrorMessage(new ErrorMessage(splittedMessage[2], string.Join(" ", splittedMessage.Skip(4))));
             }
             else if (messageCode == "BYE\r\n")
             {

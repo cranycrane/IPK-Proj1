@@ -13,17 +13,19 @@ namespace IPK_Proj1.Clients
         protected int Port { get; set; }
 
         public string? DisplayName { get; set; }
-        
+
         public bool IsAuthenticated { get; set; }
+
+        public bool IsWaitingReply { get; set; }
         
-        public bool IsWaittingReply { get; set; }
+        protected SemaphoreSlim SendSemaphore = new SemaphoreSlim(1, 1);
 
         public Client(string serverIp, int serverPort)
         {
             ServerIp = serverIp;
             Port = serverPort;
             IsAuthenticated = false;
-            IsWaittingReply = false;
+            IsWaitingReply = false;
         }
 
         public void ChangeDisplayName(string newName)
@@ -42,21 +44,26 @@ namespace IPK_Proj1.Clients
 
         public abstract Task ListenForMessagesAsync();
 
-        protected abstract void HandleServerMessage(byte[] receivedBytes, int bytesRead);
+        protected abstract Task HandleServerMessage(byte[] receivedBytes, int bytesRead);
 
-        protected void HandleReplyMessage(ReplyMessage message)
+        protected async Task HandleReplyMessage(ReplyMessage message)
         {
             if (message.IsOk == "OK")
             {
-                Console.Error.Write($"Success: {message.Content}\n");
+                await Console.Error.WriteAsync($"Success: {message.Content}\n");
             }
             else if (message.IsOk == "NOK")
             {
-                Console.Error.Write($"Failure: {message.Content}\n");
+                await Console.Error.WriteAsync($"Failure: {message.Content}\n");
             }
             else
             {
                 throw new Exception($"ERR: Unexpected server status code '{message.IsOk}'");
+            }
+
+            if (message.Content.Contains("Authorization successful"))
+            {
+                IsAuthenticated = true;
             }
         }
 
@@ -65,9 +72,9 @@ namespace IPK_Proj1.Clients
             Console.Write($"{message.DisplayName}: {message.Content}\n");
         }
 
-        protected void HandleErrorMessage(ErrorMessage message)
+        protected async Task HandleErrorMessage(ErrorMessage message)
         {
-            Console.Error.Write($"ERR FROM {message.DisplayName}: {message.Content}\n");
+            await Console.Error.WriteAsync($"ERR FROM {message.DisplayName}: {message.Content}\n");
             Disconnect();
         }
         

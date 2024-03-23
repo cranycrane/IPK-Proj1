@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using System.Threading.Tasks;
+using System.Threading;
 
 using IPK_Proj1.Clients;
 using IPK_Proj1.Commands;
@@ -14,35 +14,45 @@ namespace IPK_Proj1
 {
     public class ChatClient
     {
-        private Client client;
+        private Client Client;
 
         private readonly CommandFactory commandFactory;
         
 
         public ChatClient(CommandLineSettings settings)
         {
-            client = CreateClient(settings);
+            Client = CreateClient(settings);
             commandFactory = new CommandFactory();
             
         }
 
         public async Task Start()
         {
+            CancellationTokenSource cts = new CancellationTokenSource();
             Console.CancelKeyPress += async (sender, e) =>
             {
                 e.Cancel = true; // Zabrání ukončení procesu
-                await client.Send(new ByeMessage());
-                client.Disconnect(); // Řádné ukončení aplikace
+                await Client.Send(new ByeMessage());
+                Client.Disconnect(); // Řádné ukončení aplikace
                 Logger.Debug("Koncim aplikaci");
+                cts.Cancel(); // Signalizace zastavení
             };
-            
+
             Logger.Debug("IPKChat-24 Version 1.0, write /help for more information");
 
-            var listeningTask = client.ListenForMessagesAsync();
-            
-            while (true)
+            var listeningTask = Client.ListenForMessagesAsync();
+
+            while (!cts.IsCancellationRequested)
             {
                 string? input = Console.ReadLine();
+
+                if (input == null) // Detekce EOF
+                {
+                    await Client.Send(new ByeMessage());
+                    Client.Disconnect();
+                    Logger.Debug("EOF detekován, končím aplikaci.");
+                    break; // Ukončení hlavní smyčky
+                }
 
                 if (string.IsNullOrEmpty(input)) continue;
 
@@ -54,7 +64,6 @@ namespace IPK_Proj1
                 {
                     await SendMessage(input);
                 }
-                
             }
         }
 
@@ -69,7 +78,7 @@ namespace IPK_Proj1
             try
             {
                 ICommand command = commandFactory.GetCommand(commandName);
-                await command.Execute(client, parameters);
+                await command.Execute(Client, parameters);
             }
             catch (UnknownCommandException e)
             {
@@ -85,8 +94,8 @@ namespace IPK_Proj1
         {
             try
             {
-                var message = new ChatMessage(client.DisplayName!, input);
-                await client.Send(message);
+                var message = new ChatMessage(Client.DisplayName!, input);
+                await Client.Send(message);
                 //Console.WriteLine($"{client.DisplayName}: {input}");
             }   
             catch (Exception e)

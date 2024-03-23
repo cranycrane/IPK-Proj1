@@ -18,16 +18,18 @@ namespace IPK_Proj1.Clients
         private ushort MessageId;
         private ushort Timeout;
         private byte MaxRetries;
-        private bool IsAck;
-        private int[] ReceivedMessageIds;
+        private bool IsAck { get; set; }
+        private bool IsWaittingReply { get; set; }
+        private List<ushort> ReceivedMessageIds;
 
         public ClientUdp(string serverIp, int port, ushort timeout, byte retries) : base(serverIp, port)
         {
             Timeout = timeout;
             MaxRetries = retries;
             MessageId = 0;
-            ReceivedMessageIds = [];
+            ReceivedMessageIds = new List<ushort>();
             IsAck = false;
+            IsWaittingReply = false;
             Server = CreateIpEndPoint(Port);
             UdpClient = new UdpClient(0);
             Logger.Debug($"IP adresa serveru: {Server.Address}");
@@ -97,7 +99,7 @@ namespace IPK_Proj1.Clients
                 {
                     try
                     {
-                        HandleServerMessage(receivedBytes, receivedBytes.Length);
+                        await HandleServerMessage(receivedBytes, receivedBytes.Length);
                     }
                     catch (Exception e)
                     {
@@ -107,13 +109,23 @@ namespace IPK_Proj1.Clients
             }
         }
 
-        protected override async void HandleServerMessage(byte[] receivedBytes, int bytesRead)
+        protected override async Task HandleServerMessage(byte[] receivedBytes, int bytesRead)
         {
+            
             ushort messageId = BitConverter.ToUInt16(receivedBytes, 1);
+
+            if (ReceivedMessageIds.Contains(messageId) && receivedBytes[0] != 0)
+            {
+                Logger.Debug("Already got this message");
+                return;
+            }
+            
             if (receivedBytes[0] != 0)
             {
+                ReceivedMessageIds.Add(messageId);
                 await SendConfirmMessage(messageId);
             }
+            
 
             switch (receivedBytes[0])
             {
@@ -138,7 +150,7 @@ namespace IPK_Proj1.Clients
                     Logger.Debug($"Got REPLY: {IsWaittingReply}");
                     string content = Encoding.UTF8.GetString(receivedBytes.Skip(6).ToArray());
                     ushort refMessageId = BitConverter.ToUInt16(receivedBytes, 4);
-                    HandleReplyMessage(new ReplyMessage(content, isOk, messageId, refMessageId));
+                    await HandleReplyMessage(new ReplyMessage(content, isOk, messageId, refMessageId));
                     break;
                 }
                 case 4:
@@ -152,7 +164,7 @@ namespace IPK_Proj1.Clients
                 {
                     string displayName = ExtractDisplayName(receivedBytes, 3);
                     string content = Encoding.UTF8.GetString(receivedBytes.Skip(displayName.Length + 3).ToArray());
-                    HandleErrorMessage(new ErrorMessage(displayName, content, messageId));
+                    await HandleErrorMessage(new ErrorMessage(displayName, content, messageId));
                     break;
                 }
                 case 255:
