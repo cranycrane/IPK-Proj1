@@ -32,23 +32,29 @@ namespace IPK_Proj1
             Console.CancelKeyPress += async (sender, e) =>
             {
                 e.Cancel = true; // Zabrání ukončení procesu
-                await Client.Send(new ByeMessage());
+                if (Client.IsAuthenticated)
+                {
+                    await Client.Send(new ByeMessage());
+                }
                 Client.Disconnect(); // Řádné ukončení aplikace
                 Logger.Debug("Koncim aplikaci");
                 cts.Cancel(); // Signalizace zastavení
             };
-
+            
             Logger.Debug("IPKChat-24 Version 1.0, write /help for more information");
 
-            var listeningTask = Client.ListenForMessagesAsync();
+
 
             while (!cts.IsCancellationRequested)
             {
+                var listeningTask = Client.ListenForMessagesAsync();
+                
                 string? input = Console.ReadLine();
 
                 if (input == null) // Detekce EOF
                 {
                     await Client.Send(new ByeMessage());
+                    
                     Client.Disconnect();
                     Logger.Debug("EOF detekován, končím aplikaci.");
                     break; // Ukončení hlavní smyčky
@@ -62,7 +68,8 @@ namespace IPK_Proj1
                 }
                 else
                 {
-                    await SendMessage(input);
+                    MessageCommand message = new MessageCommand();
+                    await message.Execute(Client, [input]);
                 }
             }
         }
@@ -82,26 +89,11 @@ namespace IPK_Proj1
             }
             catch (UnknownCommandException e)
             {
-                await Console.Error.WriteLineAsync("Zadany prikaz nenalezen, pouzijte /help");
+                await Console.Error.WriteLineAsync("ERR: Zadany prikaz nenalezen, pouzijte /help");
             }
             catch (System.Exception e)
             {
                 await Console.Error.WriteLineAsync(e.Message);
-            }
-        }
-
-        private async Task SendMessage(string input)
-        {
-            try
-            {
-                var message = new ChatMessage(Client.DisplayName!, input);
-                await Client.Send(message);
-                //Console.WriteLine($"{client.DisplayName}: {input}");
-            }   
-            catch (Exception e)
-            {
-                Console.WriteLine(e);
-                throw;
             }
         }
 

@@ -20,12 +20,12 @@ namespace IPK_Proj1.Commands
 
             if (!client.Connected())
             {
-                throw new Exception("Client is not connected to the server");
+                throw new Exception("ERR: Client is not connected to the server");
             }
 
             if (client.DisplayName == null)
             {
-                throw new Exception("Client is not authenticated, use /auth command");
+                throw new Exception("ERR: Client is not authenticated, use /auth command");
             }
 
             JoinMessage message = new JoinMessage(channelId, client.DisplayName);
@@ -38,14 +38,14 @@ namespace IPK_Proj1.Commands
         {
             if (parameters.Length != 1)
             {
-                throw new ArgumentException("Unexpected number of parameters in a command");
+                throw new ArgumentException("ERR: Unexpected number of parameters in a command");
             }
             
             string channelId = parameters[0];
 
             if (!Regex.IsMatch(channelId, @"^[A-Za-z0-9\.-]{1,20}$"))
             {
-                throw new ArgumentException("Username must contain only A-Z, a-z, 0-9 and maximum of 20 characters");
+                throw new ArgumentException("ERR: Username must contain only A-Z, a-z, 0-9 and maximum of 20 characters");
             }
         }
     }

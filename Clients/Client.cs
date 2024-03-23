@@ -17,6 +17,9 @@ namespace IPK_Proj1.Clients
         public bool IsAuthenticated { get; set; }
 
         public bool IsWaitingReply { get; set; }
+
+        public TaskCompletionSource<bool>? ReplyReceivedTcs;
+        public TaskCompletionSource<bool>? IsAuthenticatedTcs;
         
         protected SemaphoreSlim SendSemaphore = new SemaphoreSlim(1, 1);
 
@@ -25,7 +28,10 @@ namespace IPK_Proj1.Clients
             ServerIp = serverIp;
             Port = serverPort;
             IsAuthenticated = false;
+            ReplyReceivedTcs = null;
+            IsAuthenticatedTcs = null;
             IsWaitingReply = false;
+
         }
 
         public void ChangeDisplayName(string newName)
@@ -61,7 +67,7 @@ namespace IPK_Proj1.Clients
                 throw new Exception($"ERR: Unexpected server status code '{message.IsOk}'");
             }
 
-            if (message.Content.Contains("Authorization successful"))
+            if (message.Content.Contains("Authentication successful"))
             {
                 IsAuthenticated = true;
             }
