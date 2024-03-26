@@ -29,8 +29,7 @@ namespace IPK_Proj1.Commands
         public void ValidateArgs(string[] parameters)
         {
             string pattern = @"^[\x20-\x7E]*$";
-
-            // Kontrola délky a obsahu řetězce
+            
             if (parameters[0].Length >= 1400 || !Regex.IsMatch(parameters[0], pattern))
             {
                 throw new ArgumentException("ERR: Long message or unexpected characters");

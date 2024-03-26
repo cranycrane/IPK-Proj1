@@ -19,7 +19,7 @@ namespace IPK_Proj1.Messages
 
         public string ToTcpString()
         {
-            throw new NotImplementedException();
+            return "";
         }
     }
 }

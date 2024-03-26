@@ -19,9 +19,8 @@ namespace IPK_Proj1.Clients
         public bool IsWaitingReply { get; set; }
 
         public TaskCompletionSource<bool>? ReplyReceivedTcs;
-        public TaskCompletionSource<bool>? IsAuthenticatedTcs;
         
-        protected SemaphoreSlim SendSemaphore = new SemaphoreSlim(1, 1);
+        protected SemaphoreSlim ReplySemaphore = new SemaphoreSlim(1, 1);
 
         public Client(string serverIp, int serverPort)
         {
@@ -29,7 +28,6 @@ namespace IPK_Proj1.Clients
             Port = serverPort;
             IsAuthenticated = false;
             ReplyReceivedTcs = null;
-            IsAuthenticatedTcs = null;
             IsWaitingReply = false;
 
         }
@@ -71,6 +69,18 @@ namespace IPK_Proj1.Clients
             {
                 IsAuthenticated = true;
             }
+            
+            await ReplySemaphore.WaitAsync();
+            if (ReplyReceivedTcs != null)
+            {
+                Logger.Debug("ReplyTask OK");
+                ReplyReceivedTcs.SetResult(true);
+            }
+            else
+            {
+                Logger.Debug("IS NULL!!!");
+            }
+            ReplySemaphore.Release();
         }
 
         protected void HandleChatMessage(ChatMessage message)

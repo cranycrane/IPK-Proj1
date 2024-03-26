@@ -1,10 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading;
-
-using IPK_Proj1.Clients;
+﻿using IPK_Proj1.Clients;
 using IPK_Proj1.Commands;
 using IPK_Proj1.Exceptions;
 using IPK_Proj1.Factory;
@@ -16,48 +10,36 @@ namespace IPK_Proj1
     {
         private Client Client;
 
-        private readonly CommandFactory commandFactory;
-        
+        private readonly CommandFactory _commandFactory;
+
 
         public ChatClient(CommandLineSettings settings)
         {
             Client = CreateClient(settings);
-            commandFactory = new CommandFactory();
-            
+            _commandFactory = new CommandFactory();
         }
 
         public async Task Start()
         {
-            CancellationTokenSource cts = new CancellationTokenSource();
+            Logger.Debug("IPKChat-24 Version 1.0, write /help for more information");
+            
             Console.CancelKeyPress += async (sender, e) =>
             {
-                e.Cancel = true; // Zabrání ukončení procesu
-                if (Client.IsAuthenticated)
-                {
-                    await Client.Send(new ByeMessage());
-                }
-                Client.Disconnect(); // Řádné ukončení aplikace
-                Logger.Debug("Koncim aplikaci");
-                cts.Cancel(); // Signalizace zastavení
+                e.Cancel = true;
+                await HandleExit();
             };
-            
-            Logger.Debug("IPKChat-24 Version 1.0, write /help for more information");
 
 
-
-            while (!cts.IsCancellationRequested)
+            while (true)
             {
                 var listeningTask = Client.ListenForMessagesAsync();
-                
+
                 string? input = Console.ReadLine();
 
-                if (input == null) // Detekce EOF
+                if (input == null)
                 {
-                    await Client.Send(new ByeMessage());
-                    
-                    Client.Disconnect();
-                    Logger.Debug("EOF detekován, končím aplikaci.");
-                    break; // Ukončení hlavní smyčky
+                    await HandleExit();
+                    break;
                 }
 
                 if (string.IsNullOrEmpty(input)) continue;
@@ -74,17 +56,24 @@ namespace IPK_Proj1
             }
         }
 
+        private async Task HandleExit()
+        {
+            await Client.Send(new ByeMessage());
+
+            Client.Disconnect();
+            Logger.Debug("Konec aplikace");
+            Environment.Exit(0);
+        }
+        
         private async Task HandleCommand(string input)
         {
-
-
             string[] splitInput = input.Substring(1).Split(' ');
             string commandName = splitInput[0];
             string[] parameters = splitInput.Skip(1).ToArray();
 
             try
             {
-                ICommand command = commandFactory.GetCommand(commandName);
+                ICommand command = _commandFactory.GetCommand(commandName);
                 await command.Execute(Client, parameters);
             }
             catch (UnknownCommandException e)
@@ -110,12 +99,8 @@ namespace IPK_Proj1
             }
             catch (ArgumentException e)
             {
-                //Console.Error.WriteLine($"ERR: {e.Message}");
                 throw new InvalidOperationException("Nepodařilo se vytvořit klienta", e);
             }
         }
-
     }
-
-
 }

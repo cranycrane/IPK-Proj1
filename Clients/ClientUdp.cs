@@ -14,12 +14,12 @@ namespace IPK_Proj1.Clients
     {
         private UdpClient UdpClient;
         public IPEndPoint Server { get; set; }
-        private IPEndPoint? ServerAssignedPort = null;
         private ushort MessageId;
         private ushort Timeout;
         private byte MaxRetries;
         private bool IsAck { get; set; }
-        private bool IsWaittingReply { get; set; }
+        protected SemaphoreSlim AckSemaphore = new SemaphoreSlim(1, 1);
+        public TaskCompletionSource<bool>? AckReceivedTcs;
         private List<ushort> ReceivedMessageIds;
 
         public ClientUdp(string serverIp, int port, ushort timeout, byte retries) : base(serverIp, port)
@@ -28,8 +28,8 @@ namespace IPK_Proj1.Clients
             MaxRetries = retries;
             MessageId = 0;
             ReceivedMessageIds = new List<ushort>();
+            AckReceivedTcs = null;
             IsAck = false;
-            IsWaittingReply = false;
             Server = CreateIpEndPoint(Port);
             UdpClient = new UdpClient(0);
             Logger.Debug($"IP adresa serveru: {Server.Address}");
@@ -84,7 +84,7 @@ namespace IPK_Proj1.Clients
                 UdpReceiveResult result;
                 try
                 {
-                    result = await UdpClient.ReceiveAsync(); 
+                    result = await UdpClient.ReceiveAsync();
                 }
                 catch (ObjectDisposedException)
                 {
@@ -111,27 +111,39 @@ namespace IPK_Proj1.Clients
 
         protected override async Task HandleServerMessage(byte[] receivedBytes, int bytesRead)
         {
-            
             ushort messageId = BitConverter.ToUInt16(receivedBytes, 1);
 
             if (ReceivedMessageIds.Contains(messageId) && receivedBytes[0] != 0)
             {
-                Logger.Debug("Already got this message");
+                string content = Encoding.UTF8.GetString(receivedBytes.ToArray());
+                Logger.Debug($"Already got this message: {content}");
                 return;
             }
-            
+
             if (receivedBytes[0] != 0)
             {
+                Logger.Debug($"Sending ACK RefID: {messageId}");
                 ReceivedMessageIds.Add(messageId);
                 await SendConfirmMessage(messageId);
             }
-            
+
 
             switch (receivedBytes[0])
             {
                 case 0:
                 {
+                    await AckSemaphore.WaitAsync();
                     IsAck = true;
+                    if (AckReceivedTcs != null)
+                    {
+                        AckReceivedTcs!.SetResult(true);
+                    }
+                    else
+                    {
+                        Logger.Debug("ACK IS NULL!!!");
+                    }
+
+                    AckSemaphore.Release();
                     break;
                 }
                 case 1:
@@ -146,8 +158,6 @@ namespace IPK_Proj1.Clients
                         isOk = "NOK";
                     }
 
-                    IsWaittingReply = false;
-                    Logger.Debug($"Got REPLY: {IsWaittingReply}");
                     string content = Encoding.UTF8.GetString(receivedBytes.Skip(6).ToArray());
                     ushort refMessageId = BitConverter.ToUInt16(receivedBytes, 4);
                     await HandleReplyMessage(new ReplyMessage(content, isOk, messageId, refMessageId));
@@ -212,34 +222,48 @@ namespace IPK_Proj1.Clients
 
             return displayName;
         }
-        
+
 
         public override async Task Send(IMessage message)
         {
-            if (IsWaittingReply && message.GetType() != typeof(ByeMessage))
+            await AckSemaphore.WaitAsync();
+            AckReceivedTcs = new TaskCompletionSource<bool>();
+            AckSemaphore.Release();
+
+            if (!IsAuthenticated && message.GetType() != typeof(AuthMessage))
             {
-                Logger.Debug("CANT SEND, WAITTING");
+                await Console.Error.WriteAsync("ERR: Not authorized. Use /auth command\n");
                 return;
             }
-            IsWaittingReply = message.IsAwaitingReply;
-            
+
+            if (message.IsAwaitingReply)
+            {
+                await ReplySemaphore.WaitAsync();
+                ReplyReceivedTcs = new TaskCompletionSource<bool>();
+                ReplySemaphore.Release();
+            }
+
             Byte[] data = message.ToUdpBytes(GetNextMessageId());
             byte retryCount = 0;
-            
+
             try
             {
-                while (retryCount < MaxRetries && !IsAck)
+                while (retryCount < MaxRetries && !AckReceivedTcs.Task.IsCompleted)
                 {
                     await UdpClient.SendAsync(data, data.Length, Server);
                     await Task.Delay(Timeout);
-                    //await WaitForAck();
 
-                    if (!IsAck)
+                    await AckSemaphore.WaitAsync();
+                    if (IsAck)
                     {
-                        retryCount++;
-                        Logger.Debug(
-                            $"Zprava nebyla potvrzena, opakuji pokus {retryCount} z {MaxRetries}");
+                        AckSemaphore.Release();
+                        break;
                     }
+
+                    AckSemaphore.Release();
+
+                    retryCount++;
+                    Logger.Debug($"Zprava nebyla potvrzena, opakuji pokus {retryCount} z {MaxRetries}");
                 }
             }
             catch (Exception ex)
@@ -247,9 +271,14 @@ namespace IPK_Proj1.Clients
                 await Console.Error.WriteLineAsync($"ERR: {ex.Message}");
             }
 
-            if (!IsAck)
+            if (!AckReceivedTcs!.Task.IsCompleted || !AckReceivedTcs.Task.Result)
             {
                 await Console.Error.WriteLineAsync("ERR: Vycerpany vsechny pokusy odeslani.");
+            }
+
+            if (message.IsAwaitingReply)
+            {
+                await ReplyReceivedTcs!.Task;
             }
 
             IsAck = false;

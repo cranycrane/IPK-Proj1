@@ -8,7 +8,7 @@ public static class Logger
     {
         if (IsDebugEnabled)
         {
-            Console.WriteLine(message);
+            Console.WriteLine("DEBUG: " + message);
         }
     }
 }

@@ -2,7 +2,7 @@
   "profiles": {
     "IPK-Proj1": {
       "commandName": "Project",
-      "commandLineArgs": "-t tcp -s anton5.fit.vutbr.cz --debug"
+      "commandLineArgs": "-t tcpp -s anton5.fit.vutbr.cz"
     }
   }
 }

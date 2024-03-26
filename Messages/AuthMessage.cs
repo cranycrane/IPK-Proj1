@@ -24,13 +24,10 @@ namespace IPK_Proj1.Messages
         {
 	        List<byte> bytesList = new List<byte>();
 
-	        // Přidání typu zprávy (předpokládáme, že 0x02 je AUTH)
 	        bytesList.Add(0x02);
 
-	        // Přidání messageId
 	        bytesList.AddRange(BitConverter.GetBytes(messageId));
 
-	        // Přidání username, secret a displayName, každý ukončený nulovým bajtem
 	        bytesList.AddRange(Encoding.UTF8.GetBytes(Username + "\0"));
 	        bytesList.AddRange(Encoding.UTF8.GetBytes(DisplayName + "\0"));
 	        bytesList.AddRange(Encoding.UTF8.GetBytes(Secret + "\0"));

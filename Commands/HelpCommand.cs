@@ -14,12 +14,17 @@ namespace IPK_Proj1.Commands
     {
         public Task Execute(Client client, string[] parameters)
         {   
+            ValidateArgs(parameters);
             Console.WriteLine("This is a help command");
             return Task.CompletedTask;
         }
 
         public void ValidateArgs(string[] parameters)
         {
+            if (parameters.Length != 0)
+            {
+                throw new ArgumentException("ERR: Unexpected number of parameters in a command");
+            }
         }
     }
 }

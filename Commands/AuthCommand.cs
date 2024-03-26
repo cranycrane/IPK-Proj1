@@ -1,12 +1,6 @@
 ﻿using IPK_Proj1.Clients;
 using IPK_Proj1.Messages;
 using System.Text.RegularExpressions;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Net.Sockets;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace IPK_Proj1.Commands
 {
@@ -22,17 +16,19 @@ namespace IPK_Proj1.Commands
 
             client.ChangeDisplayName(displayName);
 
+            if (client.IsAuthenticated)
+            {
+                await Console.Error.WriteAsync("ERR: Client is already authorized\n");
+                return;
+            }
             if (!client.Connected())
             {
-                client.Connect();
+                throw new Exception("ERR: Client is not connected to the server");
             }
 
             var message = new AuthMessage(username, secret, displayName);
 
             await client.Send(message);
-            
-            //await client.IsAuthenticatedTcs!.Task;
-            //Logger.Debug("UZ NECEKAM");
         }
 
         public void ValidateArgs(string[] parameters)

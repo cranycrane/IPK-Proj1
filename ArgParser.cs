@@ -11,6 +11,8 @@ namespace IPK_Proj1
         public CommandLineSettings Parse(string[] args)
         {
             var settings = new CommandLineSettings();
+            
+            
 
             for (int i = 0; i < args.Length; i++)
             {
@@ -23,7 +25,7 @@ namespace IPK_Proj1
                         }
                         else
                         {
-                            Console.WriteLine("Invalid value for protocol. Use 'tcp' or 'udp'.");
+                            Console.Error.WriteLine("ERR: Invalid value for protocol. Use 'tcp' or 'udp'");
                             System.Environment.Exit(1);
                         }
                         break;
@@ -34,7 +36,7 @@ namespace IPK_Proj1
                         }
                         else
                         {
-                            Console.WriteLine("No IP address or hostname specified.");
+                            Console.Error.WriteLine("ERR: No IP address or hostname specified");
                             System.Environment.Exit(1);
                         }
                         break;
@@ -46,7 +48,7 @@ namespace IPK_Proj1
                         }
                         else
                         {
-                            Console.WriteLine("Invalid or missing value for port.");
+                            Console.Error.WriteLine("ERR: Invalid or missing value for port");
                             System.Environment.Exit(1);
                         }
                         break;
@@ -58,7 +60,7 @@ namespace IPK_Proj1
                         }
                         else
                         {
-                            Console.WriteLine("Invalid or missing value for timeout.");
+                            Console.Error.WriteLine("ERR: Invalid or missing value for timeout");
                             System.Environment.Exit(1);
                         }
                         break;
@@ -70,19 +72,18 @@ namespace IPK_Proj1
                         }
                         else
                         {
-                            Console.WriteLine("Invalid or missing value for retries.");
+                            Console.Error.WriteLine("ERR: Invalid or missing value for retries");
                             System.Environment.Exit(1);
                         }
                         break;
                     case "-h":
-                        // Assuming that showing help should not stop processing arguments
                         settings.ShowHelp = true;
                         break;
                     case "--debug":
                         settings.IsDebugEnabled = true;
                         break;
                     default:
-                        Console.WriteLine($"Unknown argument: {args[i]}");
+                        Console.Error.WriteLine($"ERR: Unknown argument: {args[i]}");
                         System.Environment.Exit(1);
                         break;
                 }

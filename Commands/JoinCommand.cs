@@ -45,7 +45,7 @@ namespace IPK_Proj1.Commands
 
             if (!Regex.IsMatch(channelId, @"^[A-Za-z0-9\.-]{1,20}$"))
             {
-                throw new ArgumentException("ERR: Username must contain only A-Z, a-z, 0-9 and maximum of 20 characters");
+                throw new ArgumentException("ERR: Channel must contain only A-Z, a-z, 0-9 and maximum of 20 characters");
             }
         }
     }

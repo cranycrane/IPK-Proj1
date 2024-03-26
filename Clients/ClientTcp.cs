@@ -10,26 +10,21 @@ namespace IPK_Proj1.Clients
         private TcpClient tcpClient;
         private NetworkStream? networkStream;
         private StreamReader reader;
-        private StreamWriter writer;
 
         public ClientTcp(string serverIp, int port) : base(serverIp, port)
         {
             tcpClient = new TcpClient(serverIp, port);
             networkStream = tcpClient.GetStream();
             reader = new StreamReader(networkStream, Encoding.UTF8);
-            writer = new StreamWriter(networkStream, Encoding.UTF8);
         }
 
         public override void Connect()
         {
             try
             {
-                /*
-                tcpClient.Connect(Server);
+                tcpClient.Connect(ServerIp, Port);
                 networkStream = tcpClient.GetStream();
-                writer = new StreamWriter(networkStream, Encoding.UTF8) { AutoFlush = true };
                 reader = new StreamReader(networkStream, Encoding.UTF8);
-                */
             }
             catch (Exception ex)
             {
@@ -51,9 +46,9 @@ namespace IPK_Proj1.Clients
             {
                 if (message.IsAwaitingReply)
                 {
-                    await SendSemaphore.WaitAsync();
+                    await ReplySemaphore.WaitAsync();
                     ReplyReceivedTcs = new TaskCompletionSource<bool>();
-                    SendSemaphore.Release();
+                    ReplySemaphore.Release();
                 }
                 
                 Byte[] data = System.Text.Encoding.ASCII.GetBytes(message.ToTcpString());
@@ -80,17 +75,14 @@ namespace IPK_Proj1.Clients
                 while (networkStream != null)
                 {
                     var bytesRead = await networkStream.ReadAsync(buffer, 0, buffer.Length);
-                    if (bytesRead > 0)
+                    if (bytesRead <= 0) continue;
+                    try
                     {
-                        // var message = Encoding.UTF8.GetString(buffer, 0, bytesRead);
-                        try
-                        {
-                            await HandleServerMessage(buffer, bytesRead);
-                        }
-                        catch (Exception e)
-                        {
-                            Console.Error.WriteLine(e.Message);
-                        }
+                        await HandleServerMessage(buffer, bytesRead);
+                    }
+                    catch (Exception e)
+                    {
+                        Console.Error.WriteLine(e.Message);
                     }
                 }
             }
@@ -113,16 +105,6 @@ namespace IPK_Proj1.Clients
             {
                 await HandleReplyMessage(
                     new ReplyMessage(string.Join(" ", splittedMessage.Skip(3)), splittedMessage[1]));
-                await SendSemaphore.WaitAsync();
-                if (ReplyReceivedTcs != null)
-                {
-                    ReplyReceivedTcs.SetResult(true);
-                }
-                else
-                {
-                    Logger.Debug("IS NULL!!!");
-                }
-                SendSemaphore.Release();
             }
             else if (messageCode == "MSG")
             {
@@ -142,12 +124,7 @@ namespace IPK_Proj1.Clients
                 throw new Exception($"Unexpected server response code '{messageCode}'");
             }
         }
-
         
-        public string? Receive()
-        {
-            return reader.ReadLine();
-        }
 
         public override bool Connected()
         {

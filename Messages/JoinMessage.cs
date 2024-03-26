@@ -8,7 +8,7 @@ namespace IPK_Proj1.Messages
 		public string ChannelId { get; set; }
 		public string DisplayName { get; set; }
 		public ushort? RefMessageId { get; set; }
-		public bool IsAwaitingReply { get; set; } = false;
+		public bool IsAwaitingReply { get; set; } = true;
 
 		public JoinMessage(string channelId, string displayName, ushort? refMessageId = null)
 		{
