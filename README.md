@@ -76,9 +76,13 @@ je na _false_, nebo úloha _AckReceivedTcs_ nebyla dokončena, je vypsána chybo
 
 ## Teorie potřebná k porozumění
 ### TCP Varianta
+TCP je spolehlivý, orientovaný na spojení protokol, který se používá u většiny síťových aplikací. Zajišťuje spolehlivý přenos skrze potvrzovací mechanismy, které také umožňují obnovení ztracených či duplicitních packetů. [1] Vhodný u aplikací, kde je vyžadováná spolehlivost a integrita dat - webové aplikace, e-mailové služby, webový prohlížeč atd. [3]
 
+Implementace této varianty chat klienta nepřináší žádné větší režijní náklady jako u UDP varianty. TCP je mnohem vhodnějším protokolem pro chatovacího klienta, protože se nemůže žádná zprava ztratit, či zničit.
 ### UDP Varianta
+UDP je jednoduchý protokol, umožňující přenost dat mezi hostiteli bez zajištění doručení či ochraně proti duplicitám [2]. Je vhodnější pro aplikace, které vyžadují rychlost na úkor spolehlivosti, tedy například u streamovacích služeb, online her či hlasové/video komunikace. [4]
 
+Kvůli tomu, že není možné se dozvědět, zda zpráva byla doručena je důležité správně implementovat CONFIRM zprávy IPK24-CHAT protokolu, které tohle potvrzení zajišťují. To přináší poměrné drahé režijní náklady, protože klient musí sledovat, zda přišla odpověď a případně znovu zprávu odeslat. UDP tedy není pro chatovací aplikaci příliš vhodné. 
 ## Průběh testování
 Pro testování celkové funkčnosti klienta byl využíván software _Wireshark_ s pluginem zobrazujícím
 _IPK-24-CHAT_ protokol. 
@@ -131,3 +135,10 @@ v terminálu (formát zpráv, správná reakce, pořadí těchto zpráv), i výp
 
 
 ## Zdroje
+[1] RFC 793 - Transmission control protocol https://www.ietf.org/rfc/rfc0793.txt
+
+[2] RFC 768 - User Datagram Protocol - https://www.ietf.org/rfc/rfc768.txt
+
+[3] Wikipedia - Transmission control protocol - https://cs.wikipedia.org/wiki/Transmission_Control_Protocol
+
+[4] Wikipedia - User Datagram Protocol - https://cs.wikipedia.org/wiki/User_Datagram_Protocol
