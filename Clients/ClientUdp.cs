@@ -1,11 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Net;
+﻿using System.Net;
 using System.Net.Sockets;
 using System.Text;
-using System.Threading.Tasks;
-using System.Threading;
 using IPK_Proj1.Messages;
 
 namespace IPK_Proj1.Clients
@@ -25,17 +20,24 @@ namespace IPK_Proj1.Clients
         public ClientUdp(string serverIp, int port, ushort timeout, byte retries) : base(serverIp, port)
         {
             Timeout = timeout;
+            retries++;
             MaxRetries = retries;
             MessageId = 0;
             ReceivedMessageIds = new List<ushort>();
             AckReceivedTcs = null;
             IsAck = false;
             Server = CreateIpEndPoint(Port);
-            UdpClient = new UdpClient(0);
             Logger.Debug($"IP adresa serveru: {Server.Address}");
             Logger.Debug($"Port serveru: {Server.Port}");
+            UdpClient = new UdpClient(0);
         }
 
+        /// <summary>
+        /// Gets IPAddress of the server
+        /// </summary>
+        /// <param name="port">Port of the server</param>
+        /// <returns>IPEndpoint with the host IP adress</returns>
+        /// <exception cref="ArgumentException">When could not get the IP adress</exception>
         private IPEndPoint CreateIpEndPoint(int port)
         {
             IPAddress? ipAddress;
@@ -46,7 +48,7 @@ namespace IPK_Proj1.Clients
 
                 if (hostEntry.AddressList.Length == 0)
                 {
-                    throw new ArgumentException("Nelze získat IP adresu z hostname.", nameof(ServerIp));
+                    throw new ArgumentException("Could not get IP from the hostname.", nameof(ServerIp));
                 }
 
                 ipAddress = hostEntry.AddressList
@@ -54,7 +56,7 @@ namespace IPK_Proj1.Clients
 
                 if (ipAddress == null)
                 {
-                    throw new ArgumentException("Nenalezena žádná kompatibilní IPv4 adresa.", nameof(ServerIp));
+                    throw new ArgumentException("Did not found compatible IPv4 address.", nameof(ServerIp));
                 }
             }
 
@@ -68,55 +70,59 @@ namespace IPK_Proj1.Clients
 
         protected override void HandleByeMessage()
         {
-            Disconnect();
+            UdpClient.Close();
+            System.Environment.Exit(0);
         }
 
-        public override void Disconnect()
+        public override Task Disconnect()
         {
             UdpClient.Close();
-            Environment.Exit(0);
+            return Task.CompletedTask;
         }
 
-        public override async Task ListenForMessagesAsync()
+        public override async Task ListenForMessagesAsync(CancellationToken cancellationToken)
         {
-            while (true)
+            try
             {
-                UdpReceiveResult result;
-                try
+                while (!cancellationToken.IsCancellationRequested)
                 {
-                    result = await UdpClient.ReceiveAsync();
-                }
-                catch (ObjectDisposedException)
-                {
-                    break;
-                }
+                    var result = await UdpClient.ReceiveAsync(cancellationToken);
 
-                byte[] receivedBytes = result.Buffer;
+                    byte[] receivedBytes = result.Buffer;
 
-                Server = result.RemoteEndPoint;
+                    Server = result.RemoteEndPoint;
 
-                if (receivedBytes.Length > 0)
-                {
-                    try
+                    if (receivedBytes.Length > 0)
                     {
-                        await HandleServerMessage(receivedBytes, receivedBytes.Length);
-                    }
-                    catch (Exception e)
-                    {
-                        await Console.Error.WriteLineAsync($"ERR: {e.Message}");
+                        try
+                        {
+                            await HandleServerMessage(receivedBytes, receivedBytes.Length);
+                        }
+                        catch (Exception e)
+                        {
+                            await Console.Error.WriteLineAsync($"ERR: {e.Message}");
+                        }
                     }
                 }
+            }
+            catch (OperationCanceledException)
+            {
+                Logger.Debug("Ended receiving messages");
+            }
+            catch (ObjectDisposedException)
+            {
             }
         }
 
         protected override async Task HandleServerMessage(byte[] receivedBytes, int bytesRead)
         {
-            ushort messageId = BitConverter.ToUInt16(receivedBytes, 1);
-
+            byte[] messageIdBytes = receivedBytes.Skip(1).Take(2).ToArray();
+            ushort messageId = BitConverter.ToUInt16(messageIdBytes, 0);
+            Logger.Debug($"Got message with code: {receivedBytes[0]}");
             if (ReceivedMessageIds.Contains(messageId) && receivedBytes[0] != 0)
             {
                 string content = Encoding.UTF8.GetString(receivedBytes.ToArray());
-                Logger.Debug($"Already got this message: {content}");
+                Logger.Debug($"Already got this message: {messageId} - {content}");
                 return;
             }
 
@@ -132,16 +138,10 @@ namespace IPK_Proj1.Clients
             {
                 case 0:
                 {
+                    Logger.Debug("Got ACK");
                     await AckSemaphore.WaitAsync();
                     IsAck = true;
-                    if (AckReceivedTcs != null)
-                    {
-                        AckReceivedTcs!.SetResult(true);
-                    }
-                    else
-                    {
-                        Logger.Debug("ACK IS NULL!!!");
-                    }
+                    AckReceivedTcs!.SetResult(true);
 
                     AckSemaphore.Release();
                     break;
@@ -159,38 +159,66 @@ namespace IPK_Proj1.Clients
                     }
 
                     string content = Encoding.UTF8.GetString(receivedBytes.Skip(6).ToArray());
+                    string cleanContent = CleanContent(content);
                     ushort refMessageId = BitConverter.ToUInt16(receivedBytes, 4);
-                    await HandleReplyMessage(new ReplyMessage(content, isOk, messageId, refMessageId));
+                    await HandleReplyMessage(new ReplyMessage(cleanContent, isOk, messageId, refMessageId));
                     break;
                 }
                 case 4:
                 {
                     string displayName = ExtractDisplayName(receivedBytes, 3);
                     string content = Encoding.UTF8.GetString(receivedBytes.Skip(displayName.Length + 3).ToArray());
-                    HandleChatMessage(new ChatMessage(displayName, content, messageId));
+                    string cleanContent = CleanContent(content);
+                    HandleChatMessage(new ChatMessage(displayName, cleanContent, messageId));
                     break;
                 }
                 case 254:
                 {
                     string displayName = ExtractDisplayName(receivedBytes, 3);
                     string content = Encoding.UTF8.GetString(receivedBytes.Skip(displayName.Length + 3).ToArray());
-                    await HandleErrorMessage(new ErrorMessage(displayName, content, messageId));
+                    string cleanContent = CleanContent(content);
+                    await HandleErrorMessage(new ErrorMessage(displayName, cleanContent, messageId));
+                    Logger.Debug("Sending BYE to ERR message");
+                    await Send(new ByeMessage());
+                    await Disconnect();
+                    System.Environment.Exit(1);
                     break;
                 }
                 case 255:
                 {
-                    Console.WriteLine("BYE");
+                    Logger.Debug("BYE");
                     HandleByeMessage();
                     break;
                 }
                 default:
                 {
-                    Console.Error.WriteLine("TUTO ZPRAVU JSEM NECEKAL");
+                    await Console.Error.WriteLineAsync($"ERR: Unexpected server message with code {receivedBytes[0]}");
+                    Logger.Debug("Sending ERR Message   ");
+                    await Send(new ErrorMessage(DisplayName!, "Unexpected message code"));
+                    await Send(new ByeMessage());
+                    await Disconnect();
+                    System.Environment.Exit(1);
                     break;
                 }
             }
         }
 
+        /// <summary>
+        /// Cleans message content from unexpected bytes and characters
+        /// </summary>
+        /// <param name="content">Message content</param>
+        /// <returns>Cleaned content</returns>
+        protected string CleanContent(string content)
+        {
+            string cleanString = content.Replace("\0", string.Empty);
+            cleanString = cleanString.Replace("\u0002", string.Empty);
+            return cleanString;
+        }
+
+        /// <summary>
+        /// Sends CONFIRM message to the server
+        /// </summary>
+        /// <param name="refMessageId">Reference message ID client is sending CONFIRM to</param>
         protected async Task SendConfirmMessage(ushort refMessageId)
         {
             Byte[] data = new ConfirmMessage().ToUdpBytes(refMessageId);
@@ -204,9 +232,14 @@ namespace IPK_Proj1.Clients
             }
         }
 
+        /// <summary>
+        /// Parses DisplayName from the message
+        /// </summary>
+        /// <param name="receivedBytes">Array of bytes from the message</param>
+        /// <param name="startIndex">Start index, where displayName begins</param>
+        /// <returns>Extracted displayName</returns>
         protected string ExtractDisplayName(byte[] receivedBytes, int startIndex)
         {
-            // Nalezení indexu nulového bajtu, který ukončuje DisplayName
             int endIndexOfDisplayName = Array.IndexOf(receivedBytes, (byte)0, startIndex);
 
             if (endIndexOfDisplayName == -1)
@@ -214,10 +247,8 @@ namespace IPK_Proj1.Clients
                 throw new Exception("Nulový bajt ukončující DisplayName nebyl nalezen.");
             }
 
-            // Výpočet délky DisplayName
             int displayNameLength = endIndexOfDisplayName - startIndex;
 
-            // Extrahování bajtů DisplayName a jejich převod na řetězec
             string displayName = Encoding.UTF8.GetString(receivedBytes, startIndex, displayNameLength);
 
             return displayName;
@@ -226,15 +257,15 @@ namespace IPK_Proj1.Clients
 
         public override async Task Send(IMessage message)
         {
-            await AckSemaphore.WaitAsync();
-            AckReceivedTcs = new TaskCompletionSource<bool>();
-            AckSemaphore.Release();
-
-            if (!IsAuthenticated && message.GetType() != typeof(AuthMessage))
+            if (!IsAuthenticated && message.GetType() != typeof(AuthMessage) && message.GetType() != typeof(ByeMessage))
             {
                 await Console.Error.WriteAsync("ERR: Not authorized. Use /auth command\n");
                 return;
             }
+
+            await AckSemaphore.WaitAsync();
+            AckReceivedTcs = new TaskCompletionSource<bool>();
+            AckSemaphore.Release();
 
             if (message.IsAwaitingReply)
             {
@@ -243,6 +274,7 @@ namespace IPK_Proj1.Clients
                 ReplySemaphore.Release();
             }
 
+            Logger.Debug($"Sending message with ID: {MessageId}");
             Byte[] data = message.ToUdpBytes(GetNextMessageId());
             byte retryCount = 0;
 
@@ -271,7 +303,7 @@ namespace IPK_Proj1.Clients
                 await Console.Error.WriteLineAsync($"ERR: {ex.Message}");
             }
 
-            if (!AckReceivedTcs!.Task.IsCompleted || !AckReceivedTcs.Task.Result)
+            if (!AckReceivedTcs!.Task.IsCompleted || !AckReceivedTcs.Task.Result || !IsAck)
             {
                 await Console.Error.WriteLineAsync("ERR: Vycerpany vsechny pokusy odeslani.");
             }

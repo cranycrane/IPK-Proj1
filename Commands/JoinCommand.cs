@@ -20,7 +20,7 @@ namespace IPK_Proj1.Commands
 
             if (!client.Connected())
             {
-                throw new Exception("ERR: Client is not connected to the server");
+                client.Connect();
             }
 
             if (client.DisplayName == null)

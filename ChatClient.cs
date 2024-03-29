@@ -12,15 +12,26 @@ namespace IPK_Proj1
 
         private readonly CommandFactory _commandFactory;
 
+        private CommandLineSettings Settings;
 
+        private bool ExitHandled = false;
+        
+        private CancellationTokenSource _cts = new CancellationTokenSource();
+        
         public ChatClient(CommandLineSettings settings)
         {
-            Client = CreateClient(settings);
             _commandFactory = new CommandFactory();
+            Settings = settings;
+            Client = CreateClient();
         }
 
+        /// <summary>
+        /// Starts the client - in while loop listens for messages, handling input and waiting for the end
+        /// </summary>
         public async Task Start()
         {
+
+            
             Logger.Debug("IPKChat-24 Version 1.0, write /help for more information");
             
             Console.CancelKeyPress += async (sender, e) =>
@@ -28,13 +39,17 @@ namespace IPK_Proj1
                 e.Cancel = true;
                 await HandleExit();
             };
-
-
+            
             while (true)
             {
-                var listeningTask = Client.ListenForMessagesAsync();
+                var listeningTask = Client!.ListenForMessagesAsync(_cts.Token);
 
+                Logger.Debug("Nacitam vstup");
+
+                
                 string? input = Console.ReadLine();
+                
+                Logger.Debug("Docetl jsem vstup");
 
                 if (input == null)
                 {
@@ -54,17 +69,37 @@ namespace IPK_Proj1
                     await message.Execute(Client, [input]);
                 }
             }
+            
         }
 
+        /// <summary>
+        /// Handles gentle exit of the program.
+        /// </summary>
         private async Task HandleExit()
         {
-            await Client.Send(new ByeMessage());
+            if (ExitHandled)
+            {
+                return;
+            }
+            ExitHandled = true;
 
-            Client.Disconnect();
+            if (Client.IsAuthenticated)
+            {
+                await Client.Send(new ByeMessage());
+            }
+            
+            await Client.Disconnect();
+
+            await _cts.CancelAsync();
+            
             Logger.Debug("Konec aplikace");
             Environment.Exit(0);
         }
         
+        /// <summary>
+        /// Parses the input, creates appropriate command and executes it
+        /// </summary>
+        /// <param name="input">Input from stdin</param>
         private async Task HandleCommand(string input)
         {
             string[] splitInput = input.Substring(1).Split(' ');
@@ -85,15 +120,19 @@ namespace IPK_Proj1
                 await Console.Error.WriteLineAsync(e.Message);
             }
         }
+        
 
-        private Client CreateClient(CommandLineSettings settings)
+        /// <summary>
+        /// Creates the client depending on the selected variant
+        /// </summary>
+        private Client CreateClient()
         {
             try
             {
-                return settings.Protocol switch
+                return Settings.Protocol switch
                 {
-                    "tcp" => new ClientTcp(settings.ServerIP, settings.Port),
-                    "udp" => new ClientUdp(settings.ServerIP, settings.Port, settings.Timeout, settings.Retries),
+                    "tcp" => new ClientTcp(Settings.ServerIP, Settings.Port),
+                    "udp" => new ClientUdp(Settings.ServerIP, Settings.Port, Settings.Timeout, Settings.Retries),
                     _ => throw new ArgumentException("Unsupported protocol")
                 };
             }

@@ -11,8 +11,12 @@ namespace IPK_Proj1
         public CommandLineSettings Parse(string[] args)
         {
             var settings = new CommandLineSettings();
-            
-            
+
+            if (args.Length < 2)
+            {
+                Console.Error.WriteLine("ERR: Unexpected number of parameters");
+                System.Environment.Exit(1);
+            }
 
             for (int i = 0; i < args.Length; i++)
             {

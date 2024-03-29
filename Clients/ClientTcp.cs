@@ -29,19 +29,17 @@ namespace IPK_Proj1.Clients
             catch (Exception ex)
             {
                 Console.WriteLine($"Error connecting to server: {ex.Message}");
-                // Handle exceptions (e.g., server not available)
             }
         }
 
         public override async Task Send(IMessage message)
         {
-            
-            if (!IsAuthenticated && message.GetType() != typeof(AuthMessage))
+            if (!IsAuthenticated && message.GetType() != typeof(AuthMessage) && message.GetType() != typeof(ByeMessage))
             {
                 await Console.Error.WriteAsync("ERR: Not authorized. Use /auth command\n");
                 return;
             }
-            
+
             try
             {
                 if (message.IsAwaitingReply)
@@ -50,15 +48,14 @@ namespace IPK_Proj1.Clients
                     ReplyReceivedTcs = new TaskCompletionSource<bool>();
                     ReplySemaphore.Release();
                 }
-                
+
                 Byte[] data = System.Text.Encoding.ASCII.GetBytes(message.ToTcpString());
                 await networkStream!.WriteAsync(data, 0, data.Length);
-                
+
                 if (message.IsAwaitingReply)
                 {
                     await ReplyReceivedTcs!.Task;
                 }
-                
             }
             catch (Exception e)
             {
@@ -66,29 +63,34 @@ namespace IPK_Proj1.Clients
             }
         }
 
-        public override async Task ListenForMessagesAsync()
+        public override async Task ListenForMessagesAsync(CancellationToken cancellationToken)
         {
             try
             {
                 byte[] buffer = new byte[1024];
 
-                while (networkStream != null)
+                while (!cancellationToken.IsCancellationRequested && networkStream != null)
                 {
-                    var bytesRead = await networkStream.ReadAsync(buffer, 0, buffer.Length);
+                    var bytesRead = await networkStream.ReadAsync(buffer, 0, buffer.Length, cancellationToken);
                     if (bytesRead <= 0) continue;
+
                     try
                     {
                         await HandleServerMessage(buffer, bytesRead);
                     }
                     catch (Exception e)
                     {
-                        Console.Error.WriteLine(e.Message);
+                        await Console.Error.WriteLineAsync(e.Message);
                     }
                 }
             }
+            catch (OperationCanceledException)
+            {
+                Logger.Debug("Ended receiving messages");
+            }
             catch (Exception ex)
             {
-                Console.Error.WriteLine($"Chyba při příjmu zprávy: {ex.Message}");
+                await Console.Error.WriteLineAsync($"ERR: {ex.Message}");
             }
         }
 
@@ -114,6 +116,8 @@ namespace IPK_Proj1.Clients
             {
                 await HandleErrorMessage(
                     new ErrorMessage(splittedMessage[2], string.Join(" ", splittedMessage.Skip(4))));
+
+                await Disconnect();
             }
             else if (messageCode == "BYE\n")
             {
@@ -121,10 +125,13 @@ namespace IPK_Proj1.Clients
             }
             else
             {
-                throw new Exception($"Unexpected server response code '{messageCode}'");
+                await Send(new ErrorMessage(DisplayName!, "Unexpected message code"));
+                await Console.Error.WriteLineAsync($"ERR: Unexpected server message with code {receivedBytes[0]}");
+                await Disconnect();
+                System.Environment.Exit(1);
             }
         }
-        
+
 
         public override bool Connected()
         {
@@ -133,14 +140,25 @@ namespace IPK_Proj1.Clients
 
         protected override void HandleByeMessage()
         {
-            Disconnect();
-            Environment.Exit(0);
+            if (networkStream != null)
+            {
+                networkStream.Close();
+                networkStream = null;
+            }
+
+            tcpClient.Close();
+            System.Environment.Exit(0);
         }
 
-        public override void Disconnect()
+        public override async Task Disconnect()
         {
             if (networkStream != null)
             {
+                if (IsAuthenticated)
+                {
+                    await Send(new ByeMessage());
+                }
+
                 networkStream.Close();
                 networkStream = null;
             }

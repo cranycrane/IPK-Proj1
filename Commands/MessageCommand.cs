@@ -18,7 +18,7 @@ namespace IPK_Proj1.Commands
 
             if (!client.Connected())
             {
-                throw new Exception("Client is not connected to the server");
+                client.Connect();
             }
 
             ChatMessage message = new ChatMessage(client.DisplayName!, parameters[0]);

@@ -1,4 +1,5 @@
-﻿using System.Text;
+﻿using System.Net;
+using System.Text;
 
 
 namespace IPK_Proj1.Messages
@@ -28,7 +29,9 @@ namespace IPK_Proj1.Messages
 
 	        bytesList.Add(0x04);
 
-	        bytesList.AddRange(BitConverter.GetBytes(messageId));
+	        messageId = (ushort)IPAddress.HostToNetworkOrder((short)messageId);
+	        byte[] messageIdBytes = BitConverter.GetBytes(messageId);
+	        bytesList.AddRange(messageIdBytes);
 
 	        bytesList.AddRange(Encoding.UTF8.GetBytes(DisplayName + "\0"));
 	        bytesList.AddRange(Encoding.UTF8.GetBytes(Content + "\0"));
