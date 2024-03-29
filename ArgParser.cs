@@ -8,7 +8,7 @@ namespace IPK_Proj1
 {
     class ArgParser
     {
-        public CommandLineSettings Parse(string[] args)
+        public CommandLineSettings? Parse(string[] args)
         {
             var settings = new CommandLineSettings();
 

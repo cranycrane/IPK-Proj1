@@ -116,7 +116,7 @@ namespace IPK_Proj1.Clients
             {
                 await HandleErrorMessage(
                     new ErrorMessage(splittedMessage[2], string.Join(" ", splittedMessage.Skip(4))));
-
+                await Send(new ByeMessage());
                 await Disconnect();
             }
             else if (messageCode == "BYE\n")
@@ -127,6 +127,7 @@ namespace IPK_Proj1.Clients
             {
                 await Send(new ErrorMessage(DisplayName!, "Unexpected message code"));
                 await Console.Error.WriteLineAsync($"ERR: Unexpected server message with code {receivedBytes[0]}");
+                await Send(new ByeMessage());
                 await Disconnect();
                 System.Environment.Exit(1);
             }
@@ -154,16 +155,13 @@ namespace IPK_Proj1.Clients
         {
             if (networkStream != null)
             {
-                if (IsAuthenticated)
-                {
-                    await Send(new ByeMessage());
-                }
 
                 networkStream.Close();
                 networkStream = null;
             }
 
             tcpClient.Close();
+            await Task.CompletedTask;
         }
     }
 }

@@ -141,7 +141,7 @@ namespace IPK_Proj1.Clients
                     Logger.Debug("Got ACK");
                     await AckSemaphore.WaitAsync();
                     IsAck = true;
-                    AckReceivedTcs!.SetResult(true);
+                    AckReceivedTcs!.TrySetResult(true);
 
                     AckSemaphore.Release();
                     break;

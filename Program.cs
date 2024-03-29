@@ -3,8 +3,8 @@ namespace IPK_Proj1;
 
 class Program
 {
-    private static ChatClient chatClient;
-    private static CommandLineSettings settings;
+    private static ChatClient? _chatClient;
+    private static CommandLineSettings? _settings;
     private static TaskCompletionSource<bool> _initializationComplete = new TaskCompletionSource<bool>();
     static async Task Main(string[] args)
     {
@@ -12,19 +12,19 @@ class Program
 
         await _initializationComplete.Task;
 
-        if (settings.ShowHelp)
+        if (_settings!.ShowHelp)
         {
             return;
         }
 
-        if (settings.IsDebugEnabled)
+        if (_settings.IsDebugEnabled)
         {
             Logger.IsDebugEnabled = true;
         }
         
         try
         {
-            await chatClient.Start();
+            await _chatClient!.Start();
         }
         catch (InvalidOperationException e)
         {
@@ -38,9 +38,9 @@ class Program
     {
         ArgParser parser = new ArgParser();
 
-        settings = parser.Parse(args);
+        _settings = parser.Parse(args);
         
-        chatClient = new ChatClient(settings);
+        _chatClient = new ChatClient(_settings);
         
         _initializationComplete.SetResult(true);
     }

@@ -12,13 +12,13 @@ namespace IPK_Proj1
 
         private readonly CommandFactory _commandFactory;
 
-        private CommandLineSettings Settings;
+        private CommandLineSettings? Settings;
 
         private bool ExitHandled = false;
         
         private CancellationTokenSource _cts = new CancellationTokenSource();
         
-        public ChatClient(CommandLineSettings settings)
+        public ChatClient(CommandLineSettings? settings)
         {
             _commandFactory = new CommandFactory();
             Settings = settings;
@@ -111,7 +111,7 @@ namespace IPK_Proj1
                 ICommand command = _commandFactory.GetCommand(commandName);
                 await command.Execute(Client, parameters);
             }
-            catch (UnknownCommandException e)
+            catch (UnknownCommandException)
             {
                 await Console.Error.WriteLineAsync("ERR: Zadany prikaz nenalezen, pouzijte /help");
             }
@@ -129,7 +129,7 @@ namespace IPK_Proj1
         {
             try
             {
-                return Settings.Protocol switch
+                return Settings!.Protocol switch
                 {
                     "tcp" => new ClientTcp(Settings.ServerIP, Settings.Port),
                     "udp" => new ClientUdp(Settings.ServerIP, Settings.Port, Settings.Timeout, Settings.Retries),
