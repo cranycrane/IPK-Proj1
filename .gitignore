@@ -1,6 +1,7 @@
 # Common IntelliJ Platform excludes
 
 # User specific
+IPK-Proj1/.idea/*
 **/.idea/**/workspace.xml
 **/.idea/**/tasks.xml
 **/.idea/shelf/*
@@ -23,6 +24,7 @@
 
 *.suo
 *.user
+*.log
 .vs/
 [Bb]in/
 [Oo]bj/

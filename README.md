@@ -29,6 +29,9 @@ příkazů.
 rozhraní *IMessage* pro jednotný převod do TCP stringu (_ToTcpString_) nebo UDP bytového pole (_ToUdpBytes_).
 - **Logger.cs** - Pro výpis debugovacích zpráv, aktivován argumentem --debug.
 
+![Diagram tříd](img/ClassDiagram.png)
+**Obrázek 1 - Diagram tříd vygenerovaný z IDE Rider**
+
 ## Nejdůležitější části projektu
 Mezi páteř programu patří třídy *ClientTcp* a *ClientUdp*, které zprostředkovávají
 komunikaci se serverem - odesílání a příjem zpráv.

@@ -10,6 +10,7 @@ build:
 
 clean:
 	rm -f $(OUTPUT_BIN)
+	rm -f $(OUTPUT_BIN).pdb
 	rm -rf $(PROJECT_DIR)/obj
 	rm -rf $(PROJECT_DIR)/bin
 	rm -rf $(PROJECT_DIR)/packages
