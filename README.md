@@ -1,5 +1,6 @@
 ## FIT VUT - IPK Projekt 1
 Autor: Jakub Jeřábek (xjerab28)
+**Points: 15.28/20**
 
 Úkolem tohoto projektu bylo vytvořit chat klienta k serveru, 
 který podporuje komunikaci skrze TCP i UDP protokol.
